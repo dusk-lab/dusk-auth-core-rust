@@ -48,3 +48,42 @@ fn revoked_session_never_validates() {
         ),
     }
 }
+
+
+
+#[test]
+fn expired_session_never_validates() {
+    // Arrange
+    let store = InMemorySessionStore::new();
+    let auth = Authenticator::new(store);
+
+    let now = Timestamp(SystemTime::now());
+    let expired_at = Timestamp(SystemTime::now() - Duration::from_secs(60));
+
+    let session_id = SessionId("session-expired".to_string());
+
+    let session = Session {
+        id: session_id.clone(),
+        subject: "user-2".to_string(),
+        created_at: expired_at,
+        expires_at: expired_at,
+        revoked_at: None,
+    };
+
+    // Save expired session
+    auth.store.save(session);
+
+    let token = AccessToken("session-expired".to_string());
+
+    // Act
+    let decision = auth.validate_access_token(&token, now);
+
+    // Assert
+    match decision {
+        AuthDecision::Expired => {}
+        other => panic!(
+            "Expected Expired decision for expired session, got {:?}",
+            other
+        ),
+    }
+}
