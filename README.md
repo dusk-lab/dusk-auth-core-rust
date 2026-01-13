@@ -1,136 +1,233 @@
-# dusk-auth-core
+
+
+# dusk-auth-core-rust
 
 <div align="center">
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)
-![Status](https://img.shields.io/badge/status-stable_core-green.svg?style=flat-square)
+![Status](https://img.shields.io/badge/status-v1.0_core_complete-green.svg?style=flat-square)
 ![Language](https://img.shields.io/badge/language-rust-orange.svg?style=flat-square)
 
-**An opinionated, framework-agnostic authentication core that enforces correct session-based auth practices.**
+**A synchronous, framework-agnostic authentication core that enforces correct session-based auth practices.**
 
-[Design Philosophy](#design-philosophy) • [Core Invariants](#core-invariants) • [API Preview](#api-preview) • [Status](#status)
+[Design Philosophy](#design-philosophy) • [Core Invariants](#core-invariants) • [How to Use](#how-to-use) • [Architecture](#architecture)
 
 </div>
 
 ---
 
+## Design Philosophy
+
+Modern authentication systems often suffer from a *token-first* mindset: JWTs are treated as sessions, refresh tokens never rotate, and logout is reduced to deleting client-side state.
+
+These approaches are convenient—but dangerous.
+
+**dusk-auth-core-rust takes the opposite approach.**
+
+It is a **pure domain engine** that enforces authentication correctness through **explicit session state and non-negotiable invariants**. It does not handle HTTP, async IO, JWT encoding, or databases. Instead, it provides a strict and test-proven core that other layers must respect.
+
+This crate is intentionally:
+
+* Synchronous
+* IO-free
+* Framework-agnostic
+* Deterministic
+* Opinionated
+
+---
+
 ## Why This Library Exists
 
-In modern web development, authentication is often implemented as a grab-bag of tools—JWTs, refresh tokens, middleware—without a cohesive underlying model. This "token-first" mentality leads to dangerous implementations:
+Common authentication failures include:
 
-- **JWTs as Sessions**: Treating stateless tokens as the source of truth, making revocation impossible.
-- **Zombie Sessions**: "Logouts" that only delete cookies on the client, leaving tokens valid on the server.
-- **Infinite Refresh**: Long-lived refresh tokens that never rotate, creating permanent backdoors.
-- **Boolean Security**: Reducing complex auth states to simple `true/false` checks, hiding the difference between "expired" and "revoked".
+* **JWTs as Sessions**
+  Stateless tokens treated as the source of truth, making revocation impossible.
 
-**dusk-auth-core exists to close this gap.**
+* **Zombie Logouts**
+  “Logout” that only clears cookies while server-side state remains valid.
 
-It encodes authentication best practices into **enforced domain invariants**. Instead of providing helpers to "build your own auth," it provides a strict state machine where common security mistakes are compile-time or runtime impossibilities.
+* **Infinite Refresh Tokens**
+  Long-lived refresh tokens that never rotate, enabling permanent access if stolen.
+
+* **Boolean Auth**
+  Reducing authentication to `true / false`, hiding critical distinctions like *expired vs revoked*.
+
+**dusk-auth-core-rust encodes the correct model directly into code.**
+
+If a mistake is common, this library makes it hard—or impossible—to implement.
 
 ---
 
 ## Core Invariants
 
-This library is not a toolkit; it is a system. It enforces five non-negotiable rules:
+This library is not a toolkit. It is a system with enforced rules.
 
-### 1. The Token is Not the Session
-JSON Web Tokens are merely *derived proofs* of identity. They are not the identity itself.
-- **Rule**: All tokens must be validated against a server-side session.
-- **Effect**: If the session is deleted, all tokens—even valid ones—immediately stop working.
+### 1. The Token Is Not the Session
 
-### 2. Refresh Tokens Rotate Exactly Once
-A refresh token is a single-use ticket.
-- **Rule**: Every time a refresh token is used, it is invalidated.
-- **Effect**: If a refresh token is used twice (e.g., by an attacker), the system detects a replay attack and revokes the entire session chain.
+Tokens are derived proofs, not the source of truth.
 
-### 3. Logout is Destructive
-Logout is a server-side state mutation, not a client-side cleanup.
-- **Rule**: Calling `logout` explicitly transitions the session to a `Revoked` state.
-- **Effect**: Revoked sessions cannot be "un-revoked" or refreshed. They are dead.
-
-### 4. Auth Outcomes are Explicit
-Authentication never returns a boolean.
-- **Rule**: Validation returns a typed `Outcome` enum (`Valid`, `Expired`, `Revoked`, `Invalid`).
-- **Effect**: Developers are forced to handle each case explicitly. Logging a "Revoked" token attempt is different from handling an "Expired" one.
-
-### 5. Sessions Have a Real Lifecycle
-Sessions are mortal.
-- **Rule**: Every session has a hard creation time, expiry time, and optional revocation time.
-- **Effect**: No session lives forever.
+* All validation is performed against **server-side session state**
+* If the session is gone or revoked, *all tokens immediately stop working*
 
 ---
 
-## API Preview
+### 2. Refresh Tokens Rotate Exactly Once
 
-*Note: This design reflects the v1.0 core architecture.*
+Refresh tokens are single-use credentials.
 
-### 1. Login & Session Creation
-We don't just "sign a token." We create a session, then issue tokens for it.
+* Every successful refresh rotates the token
+* Any reuse is detected deterministically
+* Reuse automatically **revokes the entire session**
+
+---
+
+### 3. Logout Is Destructive
+
+Logout is a server-side state transition.
+
+* Calling logout revokes the session permanently
+* Revoked sessions cannot be refreshed or revalidated
+
+---
+
+### 4. Auth Outcomes Are Explicit
+
+Authentication never returns a boolean.
+
+Validation produces a typed decision:
+
+* `Valid`
+* `Expired`
+* `Revoked`
+* `Invalid`
+
+This forces correct handling and meaningful security responses.
+
+---
+
+### 5. Sessions Have a Real Lifecycle
+
+Sessions are mortal.
+
+* Creation time
+* Expiry time
+* Optional revocation time
+
+No session lives forever.
+
+---
+
+## How to Use
+
+`dusk-auth-core-rust` is used **inside your application**, not as a standalone service.
+
+### 1. Provide a Session Store
+
+You choose how sessions are persisted by implementing `SessionStore`.
 
 ```rust
-// Create a new session for a user (persistence is pluggable)
-let session = Authenticator::login(&store, user_id).await?;
-
-// Receive a typed bundle of tokens
-let tokens = session.issue_tokens(); 
-// tokens.access_token  (short-lived)
-// tokens.refresh_token (long-lived, strict rotation)
+let store = InMemorySessionStore::new();
+let auth = Authenticator::new(store);
 ```
 
-### 2. Validation (The "Guard")
-We validate the token *and* the underlying session state in one atomic operation.
+(In production, this would be backed by a database or Redis.)
+
+---
+
+### 2. Validate Access Tokens
+
+At request boundaries, validate tokens **and session state together**.
 
 ```rust
-let decision = Authenticator::validate(&store, access_token).await;
+let decision = auth.validate_access_token(&access_token, now);
 
 match decision {
-    Outcome::Valid(session) => {
-        // Safe to proceed. `session` contains up-to-date user context.
-        process_request(session);
-    },
-    Outcome::Expired => {
-        // Token is old. Client should attempt refresh.
-        return http::Response::unauthorized("Token expired");
-    },
-    Outcome::Revoked(reason) => {
-        // CRITICAL: Token signature is valid, but session was killed.
-        // potentially malicious activity.
-        security_log::alert("Attempt to use revoked session", reason);
-        return http::Response::forbidden("Session revoked");
-    },
-    Outcome::Invalid => {
-        // Bad signature or malformed token.
-        return http::Response::unauthorized("Invalid token");
+    AuthDecision::Valid(session) => {
+        // Safe to proceed
+    }
+    AuthDecision::Expired => {
+        // Client may attempt refresh
+    }
+    AuthDecision::Revoked => {
+        // Security event: token was valid but session was killed
+    }
+    AuthDecision::Invalid => {
+        // Malformed or unknown token
     }
 }
 ```
 
-### 3. Secure Refresh
-Refresh checks the chain of custody.
+---
+
+### 3. Refresh Tokens Securely
+
+Refresh enforces rotation and reuse detection.
 
 ```rust
-// Rotates the refresh token and updates the session heartbeat
-let new_tokens = Authenticator::refresh(&store, old_refresh_token).await?;
+let (new_access, new_refresh) =
+    auth.refresh_session(&refresh_token, now)?;
 ```
+
+If a refresh token is reused:
+
+* The session is revoked
+* All tokens become invalid
+* A `RefreshTokenReused` error is returned
+
+---
+
+### 4. Logout (Server-Side)
+
+Logout is explicit and destructive.
+
+```rust
+auth.revoke_session(&session_id);
+```
+
+After this:
+
+* Validation returns `Revoked`
+* Refresh is impossible
 
 ---
 
 ## Architecture
 
-This library is **framework-agnostic**. It handles the logic; you handle the plumbing.
+**This crate is the core, not the whole system.**
 
-- **IO-Free Core**: No HTTP, no headers, no cookies.
-- **Pluggable Storage**: Comes with an `InMemoryStore` for testing. Implement the `SessionStore` trait to persist to Redis, Postgres, or SQLx.
-- **Zero Magic**: No hidden background threads or global state.
+* **No HTTP**
+* **No async**
+* **No JWT encoding**
+* **No databases**
+* **No framework dependencies**
+
+Those concerns belong in **adapter crates** built on top of this core.
+
+Typical layering:
+
+```
+dusk-auth-core-rust        ← this crate (rules & invariants)
+dusk-auth-adapter-*  ← HTTP / async / framework glue
+application code     ← routing, storage, identity
+```
+
+---
 
 ## Status
 
-**Current Version**: `v1.0 Design Protocol`
+**Current Version**: `v1.0 (core complete)`
 
-This project is currently in the strict design phase. The architecture described above is the finalized specification for the Rust implementation.
+The core authentication engine is complete and fully covered by invariant tests.
+Future work will focus on adapters and integrations, not changes to the core logic.
+
+---
 
 ## License
 
 Licensed under the **MIT License**.
 
-Contributions are welcome, provided they strictly adhere to the [Core Invariants](#core-invariants).
+Contributions are welcome **only if they preserve the core invariants**.
+
+---
+
+
