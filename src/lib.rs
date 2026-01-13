@@ -1,4 +1,5 @@
-//! dusk-auth-core
+#![doc = include_str!("../DOCUMENTATION.md")]
+//! dusk-auth-core-rust
 //!
 //! An opinionated, framework-agnostic authentication core.
 pub mod auth;

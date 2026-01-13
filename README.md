@@ -12,6 +12,8 @@
 
 [Design Philosophy](#design-philosophy) • [Core Invariants](#core-invariants) • [How to Use](#how-to-use) • [Architecture](#architecture)
 
+📖 **[Read the Full Documentation & Manifesto](./DOCUMENTATION.md)**
+
 </div>
 
 ---
