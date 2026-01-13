@@ -113,3 +113,43 @@ fn missing_session_returns_invalid() {
         ),
     }
 }
+
+
+#[test]
+fn active_session_validates() {
+    // Arrange
+    let store = InMemorySessionStore::new();
+    let auth = Authenticator::new(store);
+
+    let now = TimeStamp(SystemTime::now());
+    let expires_at = TimeStamp(SystemTime::now() + Duration::from_secs(3600));
+
+    let session_id = SessionId("session-active".to_string());
+
+    let session = Session {
+        id: session_id.clone(),
+        subject: "user-active".to_string(),
+        created_at: now,
+        expires_at,
+        revoked_at: None,
+    };
+
+    // Save active session
+    auth.store.save(session.clone());
+
+    let token = AccessToken("session-active".to_string());
+
+    // Act
+    let decision = auth.validate_access_token(&token, now);
+
+    // Assert
+    match decision {
+        AuthDecision::Valid(returned_session) => {
+            assert_eq!(returned_session.id, session.id);
+        }
+        other => panic!(
+            "Expected Valid decision for active session, got {:?}",
+            other
+        ),
+    }
+}
