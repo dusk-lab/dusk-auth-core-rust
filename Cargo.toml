@@ -1,0 +1,12 @@
+[package]
+name = "dusk-auth-core-rust"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "An opinionated, framework-agnostic authentication core enforcing correct session-based auth practices"
+repository = "https://github.com/dusk-lab/dusk-auth-core-rust.git"
+readme = "README.md"
+keywords = ["authentication", "security", "session", "auth"]
+categories = ["authentication", "security"]
+
+[dependencies]
