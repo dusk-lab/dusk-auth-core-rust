@@ -10,3 +10,4 @@ keywords = ["authentication", "security", "session", "auth"]
 categories = ["authentication", "security"]
 
 [dependencies]
+uuid = { version = "1.12.0", features = ["v4"] }

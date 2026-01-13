@@ -8,6 +8,8 @@ use dusk_auth_core_rust::{
     Session,
     SessionId,
     SessionStore,
+    RefreshToken,
+    AuthError,
 };
 // use dusk_auth_core_rust::time::Timestamp;
 use std::time::{Duration, SystemTime};
@@ -186,5 +188,62 @@ fn logout_revokes_session() {
     match decision {
         AuthDecision::Revoked => {}
         other => panic!("Expected Revoked decision after logout, got {:?}", other),
+    }
+}
+
+
+#[test]
+fn refresh_token_reuse_revokes_session() {
+    let store = InMemorySessionStore::new();
+    let auth = Authenticator::new(store);
+
+    let now = Timestamp(SystemTime::now());
+    let expires_at = Timestamp(SystemTime::now() + Duration::from_secs(3600));
+
+    // Initial refresh token id
+    let refresh_token_id = "refresh-1".to_string();
+
+    let session_id = SessionId("session-refresh".to_string());
+
+    let session = Session {
+        id: session_id.clone(),
+        subject: "user-refresh".to_string(),
+        created_at: now,
+        expires_at,
+        revoked_at: None,
+        current_refresh_token_id: RefreshTokenId(refresh_token_id.clone()),
+    };
+
+    auth.store.save(session);
+
+    // First refresh token (valid)
+    let refresh_token = RefreshToken {
+        session_id: session_id.clone(),
+        refresh_token_id: RefreshTokenId(refresh_token_id.clone()),
+    };
+
+    // Act 1: First refresh should succeed
+    let result = auth.refresh_session(&refresh_token, now);
+    assert!(result.is_ok(), "first refresh should succeed");
+
+    // Act 2: Reuse the same refresh token
+    let reuse_result = auth.refresh_session(&refresh_token, now);
+
+    // Assert: reuse revokes the session
+    match reuse_result {
+        Err(AuthError::RefreshTokenReused) => {}
+        other => panic!("Expected RefreshTokenReused error, got {:?}", other),
+    }
+
+    // Assert: session is now revoked
+    let access_token = AccessToken("session-refresh".to_string());
+    let decision = auth.validate_access_token(&access_token, now);
+
+    match decision {
+        AuthDecision::Revoked => {}
+        other => panic!(
+            "Expected session to be revoked after refresh token reuse, got {:?}",
+            other
+        ),
     }
 }

@@ -1,8 +1,13 @@
+use crate::session::SessionId;
+
 #[derive(Debug, Clone)]
 pub struct AccessToken(pub String);
 
 #[derive(Debug, Clone)]
-pub struct RefreshToken(pub String);
+pub struct RefreshToken {
+    pub session_id: SessionId,
+    pub refresh_token_id: RefreshTokenId,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RefreshTokenId(pub String);
