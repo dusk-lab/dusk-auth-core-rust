@@ -3,7 +3,7 @@ use crate::session::{Session, SessionId};
 pub trait SessionStore {
     fn load(&self, id: &SessionId) -> Option<Session>;
     fn save(&self, session: Session);
-    fn revoke (&self, id: &SessionId);
+    fn revoke(&self, id: &SessionId);
 }
 
 pub mod memory;

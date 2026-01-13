@@ -1,6 +1,6 @@
 use crate::time::TimeStamp;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(pub String);
 
 #[derive(Debug, Clone)]
