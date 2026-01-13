@@ -1,7 +1,6 @@
 //! dusk-auth-core
 //!
 //! An opinionated, framework-agnostic authentication core.
-
 pub mod auth;
 pub mod session;
 pub mod token;

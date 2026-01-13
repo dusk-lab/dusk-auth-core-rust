@@ -1,12 +1,13 @@
-use dusk_auth_core::{
+use dusk_auth_core_rust::{
     Authenticator,
     AuthDecision,
     InMemorySessionStore,
     Session,
     SessionId,
     AccessToken,
+    SessionStore
 };
-use dusk_auth_core::time::Timestamp;
+use dusk_auth_core_rust::time::TimeStamp;
 use std::time::{SystemTime, Duration};
 
 #[test]
@@ -15,8 +16,8 @@ fn revoked_session_never_validates() {
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = Timestamp(SystemTime::now());
-    let expires_at = Timestamp(SystemTime::now() + Duration::from_secs(3600));
+    let now = TimeStamp(SystemTime::now());
+    let expires_at = TimeStamp(SystemTime::now() + Duration::from_secs(3600));
 
     let session_id = SessionId("session-123".to_string());
 
@@ -57,8 +58,8 @@ fn expired_session_never_validates() {
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = Timestamp(SystemTime::now());
-    let expired_at = Timestamp(SystemTime::now() - Duration::from_secs(60));
+    let now = TimeStamp(SystemTime::now());
+    let expired_at = TimeStamp(SystemTime::now() - Duration::from_secs(60));
 
     let session_id = SessionId("session-expired".to_string());
 
@@ -83,6 +84,31 @@ fn expired_session_never_validates() {
         AuthDecision::Expired => {}
         other => panic!(
             "Expected Expired decision for expired session, got {:?}",
+            other
+        ),
+    }
+}
+
+
+#[test]
+fn missing_session_returns_invalid() {
+    // Arrange
+    let store = InMemorySessionStore::new();
+    let auth = Authenticator::new(store);
+
+    let now = TimeStamp(SystemTime::now());
+
+    // Token refers to a session that does not exist
+    let token = AccessToken("non-existent-session".to_string());
+
+    // Act
+    let decision = auth.validate_access_token(&token, now);
+
+    // Assert
+    match decision {
+        AuthDecision::Invalid => {}
+        other => panic!(
+            "Expected Invalid decision for missing session, got {:?}",
             other
         ),
     }
