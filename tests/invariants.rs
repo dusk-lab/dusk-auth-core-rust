@@ -153,3 +153,40 @@ fn active_session_validates() {
         ),
     }
 }
+
+
+#[test]
+fn logout_revokes_session() {
+    let store = InMemorySessionStore::new();
+    let auth = Authenticator::new(store);
+
+    let now = TimeStamp(SystemTime::now());
+    let expires_at = TimeStamp(SystemTime::now() + Duration::from_secs(3600));
+
+    let session_id = SessionId("session-logout".to_string());
+
+    let session = Session {
+        id: session_id.clone(),
+        subject: "user-logout".to_string(),
+        created_at: now,
+        expires_at,
+        revoked_at: None,
+    };
+
+    auth.store.save(session);
+
+    // Act: logout
+    auth.revoke_session(&session_id);
+
+    let token = AccessToken("session-logout".to_string());
+    let decision = auth.validate_access_token(&token, now);
+
+    // Assert
+    match decision {
+        AuthDecision::Revoked => {}
+        other => panic!(
+            "Expected Revoked decision after logout, got {:?}",
+            other
+        ),
+    }
+}

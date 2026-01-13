@@ -40,6 +40,13 @@ impl<S: SessionStore> Authenticator<S> {
 
         AuthDecision::Valid(session)
     }
+
+    /// Revoke a session (server-side logout).
+    ///
+    /// This operation is idempotent.
+    pub fn revoke_session(&self, session_id: &SessionId) {
+        self.store.revoke(session_id);
+    }
 }
 
 
