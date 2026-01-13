@@ -4,6 +4,9 @@ pub struct AccessToken(pub String);
 #[derive(Debug, Clone)]
 pub struct RefreshToken(pub String);
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefreshTokenId(pub String);
+
 impl AccessToken {
     /// Temporary helper to extract a session id.
     /// In real systems, this would come from decoding a JWT or similar

@@ -1,9 +1,9 @@
 use crate::{
-    store::SessionStore,
     decision::AuthDecision,
     session::SessionId,
+    store::SessionStore,
+    time::Timestamp,
     token::AccessToken,
-    time::TimeStamp,
 };
 
 pub struct Authenticator<S: SessionStore> {
@@ -15,11 +15,7 @@ impl<S: SessionStore> Authenticator<S> {
         Self { store }
     }
 
-    pub fn validate_access_token(
-        &self,
-        token: &AccessToken,
-        now: TimeStamp,
-    ) -> AuthDecision {
+    pub fn validate_access_token(&self, token: &AccessToken, now: Timestamp) -> AuthDecision {
         let session_id = match token.session_id() {
             Some(id) => SessionId(id),
             None => return AuthDecision::Invalid,
@@ -48,5 +44,3 @@ impl<S: SessionStore> Authenticator<S> {
         self.store.revoke(session_id);
     }
 }
-
-

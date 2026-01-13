@@ -1,4 +1,8 @@
-use crate::time::TimeStamp;
+use crate::{
+    token:: RefreshTokenId,
+    time::Timestamp
+};
+use std::hash::Hash;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SessionId(pub String);
@@ -7,9 +11,13 @@ pub struct SessionId(pub String);
 pub struct Session {
     pub id: SessionId,
     pub subject:String,
-    pub created_at: TimeStamp,
-    pub expires_at: TimeStamp,
-    pub revoked_at: Option<TimeStamp>,
+    pub created_at: Timestamp,
+    pub expires_at: Timestamp,
+    pub revoked_at: Option<Timestamp>,
+
+    /// The currently valid refresh token identifier.
+    /// Any mismatch indicates reuse or forgery.
+    pub current_refresh_token_id: RefreshTokenId,
 }
 
 impl Session {
@@ -19,7 +27,7 @@ impl Session {
     }
 
     /// Returns true if the session has expired at the given time
-    pub fn is_expired(&self, now: TimeStamp) -> bool {
+    pub fn is_expired(&self, now: Timestamp) -> bool {
         now >= self.expires_at
     }
 
@@ -27,7 +35,7 @@ impl Session {
     ///
     /// Note: This does NOT mean authenticated — only that the session
     /// has not expired and has not been revoked.
-    pub fn is_active(&self, now: TimeStamp) -> bool {
+    pub fn is_active(&self, now: Timestamp) -> bool {
         !self.is_revoked() && !self.is_expired(now)
     }
     

@@ -1,14 +1,16 @@
 use dusk_auth_core_rust::{
-    Authenticator,
+    time::Timestamp,
+    token::RefreshTokenId,
+    AccessToken,
     AuthDecision,
+    Authenticator,
     InMemorySessionStore,
     Session,
     SessionId,
-    AccessToken,
-    SessionStore
+    SessionStore,
 };
-use dusk_auth_core_rust::time::TimeStamp;
-use std::time::{SystemTime, Duration};
+// use dusk_auth_core_rust::time::Timestamp;
+use std::time::{Duration, SystemTime};
 
 #[test]
 fn revoked_session_never_validates() {
@@ -16,8 +18,8 @@ fn revoked_session_never_validates() {
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = TimeStamp(SystemTime::now());
-    let expires_at = TimeStamp(SystemTime::now() + Duration::from_secs(3600));
+    let now = Timestamp(SystemTime::now());
+    let expires_at = Timestamp(SystemTime::now() + Duration::from_secs(3600));
 
     let session_id = SessionId("session-123".to_string());
 
@@ -27,6 +29,7 @@ fn revoked_session_never_validates() {
         created_at: now,
         expires_at,
         revoked_at: None,
+        current_refresh_token_id: RefreshTokenId("Intial".to_string()),
     };
 
     // Save session
@@ -50,16 +53,14 @@ fn revoked_session_never_validates() {
     }
 }
 
-
-
 #[test]
 fn expired_session_never_validates() {
     // Arrange
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = TimeStamp(SystemTime::now());
-    let expired_at = TimeStamp(SystemTime::now() - Duration::from_secs(60));
+    let now = Timestamp(SystemTime::now());
+    let expired_at = Timestamp(SystemTime::now() - Duration::from_secs(60));
 
     let session_id = SessionId("session-expired".to_string());
 
@@ -69,6 +70,7 @@ fn expired_session_never_validates() {
         created_at: expired_at,
         expires_at: expired_at,
         revoked_at: None,
+        current_refresh_token_id: RefreshTokenId("Intial".to_string()),
     };
 
     // Save expired session
@@ -89,14 +91,13 @@ fn expired_session_never_validates() {
     }
 }
 
-
 #[test]
 fn missing_session_returns_invalid() {
     // Arrange
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = TimeStamp(SystemTime::now());
+    let now = Timestamp(SystemTime::now());
 
     // Token refers to a session that does not exist
     let token = AccessToken("non-existent-session".to_string());
@@ -114,15 +115,14 @@ fn missing_session_returns_invalid() {
     }
 }
 
-
 #[test]
 fn active_session_validates() {
     // Arrange
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = TimeStamp(SystemTime::now());
-    let expires_at = TimeStamp(SystemTime::now() + Duration::from_secs(3600));
+    let now = Timestamp(SystemTime::now());
+    let expires_at = Timestamp(SystemTime::now() + Duration::from_secs(3600));
 
     let session_id = SessionId("session-active".to_string());
 
@@ -132,6 +132,7 @@ fn active_session_validates() {
         created_at: now,
         expires_at,
         revoked_at: None,
+        current_refresh_token_id: RefreshTokenId("Intial".to_string()),
     };
 
     // Save active session
@@ -154,14 +155,13 @@ fn active_session_validates() {
     }
 }
 
-
 #[test]
 fn logout_revokes_session() {
     let store = InMemorySessionStore::new();
     let auth = Authenticator::new(store);
 
-    let now = TimeStamp(SystemTime::now());
-    let expires_at = TimeStamp(SystemTime::now() + Duration::from_secs(3600));
+    let now = Timestamp(SystemTime::now());
+    let expires_at = Timestamp(SystemTime::now() + Duration::from_secs(3600));
 
     let session_id = SessionId("session-logout".to_string());
 
@@ -171,6 +171,7 @@ fn logout_revokes_session() {
         created_at: now,
         expires_at,
         revoked_at: None,
+        current_refresh_token_id: RefreshTokenId("Intial".to_string()),
     };
 
     auth.store.save(session);
@@ -184,9 +185,6 @@ fn logout_revokes_session() {
     // Assert
     match decision {
         AuthDecision::Revoked => {}
-        other => panic!(
-            "Expected Revoked decision after logout, got {:?}",
-            other
-        ),
+        other => panic!("Expected Revoked decision after logout, got {:?}", other),
     }
 }
